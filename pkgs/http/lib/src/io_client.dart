@@ -6,6 +6,7 @@ import 'dart:io';
 
 import 'base_client.dart';
 import 'base_request.dart';
+import 'encrept.utils.dart';
 import 'exception.dart';
 import 'io_streamed_response.dart';
 
@@ -25,9 +26,9 @@ BaseClient createClient() {
 ///
 /// Implements [SocketException] to avoid breaking existing users of
 /// [IOClient] that may catch that exception.
-class _ClientSocketException extends ClientException
-    implements SocketException {
+class _ClientSocketException extends ClientException implements SocketException {
   final SocketException cause;
+
   _ClientSocketException(SocketException e, Uri url)
       : cause = e,
         super(e.message, url);
@@ -48,14 +49,17 @@ class IOClient extends BaseClient {
   HttpClient? _inner;
 
   IOClient([HttpClient? inner]) : _inner = inner ?? HttpClient();
+  final GenerateStamp _stamp = GenerateStamp();
 
   /// Sends an HTTP request and asynchronously returns the response.
   @override
   Future<IOStreamedResponse> send(BaseRequest request) async {
     if (_inner == null) {
-      throw ClientException(
-          'HTTP request failed. Client is already closed.', request.url);
+      throw ClientException('HTTP request failed. Client is already closed.', request.url);
     }
+    // request.headers['User-Agent'] = 'dart-io';
+    request.headers['x-timestamp'] = _stamp.getStamp().toString();
+    request.headers['x-api-key'] = _stamp.getXApiKey();
 
     var stream = request.finalize();
 
@@ -82,8 +86,7 @@ class IOClient extends BaseClient {
             throw ClientException(httpException.message, httpException.uri);
           }, test: (error) => error is HttpException),
           response.statusCode,
-          contentLength:
-              response.contentLength == -1 ? null : response.contentLength,
+          contentLength: response.contentLength == -1 ? null : response.contentLength,
           request: request,
           headers: headers,
           isRedirect: response.isRedirect,
